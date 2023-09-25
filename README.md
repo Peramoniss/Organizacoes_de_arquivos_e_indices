@@ -1,0 +1,1 @@
+A média de instalações de aplicativos free é maior do que a média dos aplicativos premium?
