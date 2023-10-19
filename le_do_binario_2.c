@@ -84,7 +84,7 @@ void insere(struct nodo_header **raiz, char categoria[100], char conteudo[100], 
 
 }
 
-int consulta(struct nodo_header *raiz, char modo[100], int limit){
+int consulta_categoria(struct nodo_header *raiz, char modo[100], int limit){
   if(raiz == NULL) return 1;
   int w = 0, enter = 0, i = 0;
   if(strcmp(modo, "write") == 0)  w=1;
@@ -108,11 +108,46 @@ int consulta(struct nodo_header *raiz, char modo[100], int limit){
       if(!w) break;
     }
 
-    
+    if(enter) break;
     aux = aux->prox_header;
   }
 
   printf("%d apps existem nesse filtro\n", i-1);
+
+  return 0;
+}
+
+int consulta_chave_categoria(struct nodo_header *raiz, char modo[100], char chave[100]){
+  if(raiz == NULL) return 1;
+  int w = 0, enter = 0, i = 0;
+  if(strcmp(modo, "write") == 0)  w=1;
+  struct nodo_header *aux;
+  aux = raiz;
+  while(aux != NULL){
+    if(w || strcmp(modo, aux->categoria) == 0){
+      printf("%s: \n", aux->categoria);
+      enter = 1;
+    } 
+    struct nodo_conteudo *auxiliar = aux->lista;
+
+    if(auxiliar == NULL)
+      printf("Vazio");
+    if(enter){
+      while(auxiliar != NULL){
+        if(strcmp(chave, auxiliar->nome) == 0){
+          printf("   %s foi encontrado em (%d)\n", auxiliar->nome, (auxiliar->pos) / 350);
+          w = 0;
+          break;
+        }
+        auxiliar = auxiliar->prox_conteudo;
+      }
+      printf("\n");
+      if(!w) break;
+    }
+
+    if(enter) break;
+    aux = aux->prox_header;
+  }
 
   return 0;
 }
@@ -149,7 +184,7 @@ int pathToLeaves(node *const root, node *child);
 void printLeaves(node *const root);
 void printTree(node *const root);
 void findAndPrint(node *const root, int key, bool verbose, int limit);
-void findAndPrintRange(node *const root, int range1, int range2, bool verbose);
+void findAndPrintRange(node *const root, int range1, int range2, bool verbose, int limit);
 int findRange(node *const root, int key_start, int key_end, bool verbose,
         int returned_keys[], void *returned_pointers[]);
 node *findLeaf(node *const root, int key, bool verbose);
@@ -309,8 +344,8 @@ void findAndPrint(node *const root, int key, bool verbose, int limit) {
 
 // Find and print the range
 void findAndPrintRange(node *const root, int key_start, int key_end,
-             bool verbose) {
-  int i;
+             bool verbose, int limit) {
+  int i, j=0;
   int array_size = key_end - key_start + 1;
   int returned_keys[array_size];
   void *returned_pointers[array_size];
@@ -319,13 +354,16 @@ void findAndPrintRange(node *const root, int key_start, int key_end,
   if (!num_found)
     printf("None found.\n");
   else {
-    for (i = 0; i < num_found; i++)
-      printf("Key: %d   Location: %p  Value: %d\n",
-           returned_keys[i],
-           returned_pointers[i],
-           ((record *)
-            returned_pointers[i])
-             ->value);
+    for (i = 0; i < num_found; i++){
+      //if(i>limit) break;
+      j=0;
+      struct nodo_conteudo *aux = ((record *) returned_pointers[i])->pos;
+      while(aux != NULL && j<limit){
+        printf("Record at %p -- %d time, key %d, value %d, position %d.\n",
+          returned_pointers[i], j++, returned_keys[i], ((record *) returned_pointers[i])->value, (aux->pos + 350) / 350);
+        aux = aux->prox_conteudo;
+      }
+    }
   }
 }
 
@@ -747,7 +785,7 @@ void gera_indice_lista(struct nodo_header **raiz){
         j++;
     }
 
-    printf("Indice em lista gerado com sucesso");
+    //printf("Indice em lista gerado com sucesso");
     fclose(read_ptr);
 }
 
@@ -883,7 +921,7 @@ void quicksort(char *arr[], unsigned int length) {
 // function for comparing two strings. This function 
 // is passed as a parameter to _quickSort() when we 
 // want to sort  
-int cmpstr(void* v1, void* v2) 
+/*int cmpstr(void* v1, void* v2) 
 { 
     // casting v1 to char** and then assigning it to 
     // pointer to v1 as v1 is array of characters i.e 
@@ -891,7 +929,40 @@ int cmpstr(void* v1, void* v2)
     char *a1 = *(char**)v1; 
     char *a2 = *(char**)v2; 
     return strcmp(a1, a2); 
-} 
+} */
+int cmpstr(const void* v1, const void* v2) {
+    const char* a1 = *(const char**)v1;
+    const char* a2 = *(const char**)v2;
+
+    // Create temporary copies of a1 and a2 for comparison
+    char a1_copy[strlen(a1) + 1];
+    char a2_copy[strlen(a2) + 1];
+    strcpy(a1_copy, a1);
+    strcpy(a2_copy, a2);
+
+    // Use strtok on the temporary copies
+    char* token1 = strtok(a1_copy, ";");
+    char* token2 = strtok(a2_copy, ";");
+
+    // Compare the tokens
+    while (token1 && token2) {
+        int cmp = strcmp(token1, token2);
+        if (cmp != 0) {
+            return cmp;
+        }
+        token1 = strtok(NULL, ";");
+        token2 = strtok(NULL, ";");
+    }
+
+    // If one string has more tokens, consider it greater
+    if (token1) {
+        return 1;
+    } else if (token2) {
+        return -1;
+    } else {
+        return 0; // Both strings are equal
+    }
+}
 
 /* you can also write compare function for floats, 
     chars, double similarly as integer. */
@@ -1091,13 +1162,16 @@ int pesquisa_binaria(char comparativo[]){
     char ultimo[350];
     //int ultimo;
 
-    for(i = 0; i<strlen(comparativo); i++){ //coloca em minúsculas (tolower()) para efeito de comaparação
+    strcpy(comparacao,comparativo); //temp
+
+    /*for(i = 0; i<strlen(comparativo); i++){ //coloca em minúsculas (tolower()) para efeito de comaparação
         comparacao[i] = tolower(comparativo[i]);
     }
-    comparacao[i] = '\0'; //encerra novo string com minusculas
+    comparacao[i] = '\0'; //encerra novo string com minusculas*/
 
     fseek(read_ptr, 0, SEEK_END);
     int fim = ftell(read_ptr); //indica o tamanho do arquivo
+    printf("%d", fim/350);
     int inicio = 0;
     rewind(read_ptr); //volta arquivo para o comeco
 
@@ -1121,13 +1195,13 @@ int pesquisa_binaria(char comparativo[]){
         
         indice = strtok(buffer, ";"); //pega so o nome do app        
 
-        for(int i = 0; i<strlen(indice); i++){ //deixa em minúsculas
+        /*for(int i = 0; i<strlen(indice); i++){ //deixa em minúsculas
             if(indice[i]>='A' && indice[i]<='Z')
                 indice[i] = tolower(indice[i]);
-        }
+        }*/
 
         int resultado = strcmp(indice, comparacao); //compara
-        //printf("%s VS %s = %d - ", indice, comparacao, resultado);
+        //printf("%s VS %s = %d - \n", indice, comparacao, resultado);
 
         if(resultado == 0){
             fseek(read_ptr, offset, SEEK_SET); //retoma a posição
@@ -1160,10 +1234,12 @@ int pesquisa_binaria_indice_parcial(char comparativo[]){
     char buffer[350], *indice, backup[350], carac, comparacao[350];
     int i, ultimo;
 
-    for(i = 0; i<strlen(comparativo); i++){ //coloca em minúsculas (tolower()) para efeito de comaparação
+    strcpy(comparacao, comparativo);
+
+    /*for(i = 0; i<strlen(comparativo); i++){ //coloca em minúsculas (tolower()) para efeito de comaparação
         comparacao[i] = tolower(comparativo[i]);
     }
-    comparacao[i] = '\0'; //encerra novo string com minusculas
+    comparacao[i] = '\0'; //encerra novo string com minusculas*/
 
     fseek(read_ptr, 0, SEEK_END); 
     int fim = ftell(read_ptr); //indica o tamanho do arquivo
@@ -1189,19 +1265,21 @@ int pesquisa_binaria_indice_parcial(char comparativo[]){
             FILE *read_ptr2;
             read_ptr2 = fopen("teste.bin", "rb");
 
-            strtok(backup, ";"); //ignora nome do app
+            char *teste = strtok(backup, ";"); //ignora nome do app
             offset = atoi(strtok(NULL, ";")); //pega a posição onde há o valor limite            
+            printf("%s (%d)", teste, offset);
 
             while(1)
             {
                 fseek(read_ptr2, offset, SEEK_SET); //vai até a posição do valor limite
                 fread(buffer, 350, 1, read_ptr2); //lê o app limite
                 indice = strtok(buffer, ";"); //separa só o nome
+                printf("%s\n", indice);
 
-                for(int j = 0; j<strlen(indice); j++){ //converte para minusculas
+                /*for(int j = 0; j<strlen(indice); j++){ //converte para minusculas
                     if(indice[j]>='A' && indice[j]<='Z')
                         indice[j] = tolower(indice[j]);
-                }
+                }*/
 
                 int resultado = strcmp(indice, comparacao); //compara
                 if(resultado == 0){
@@ -1217,13 +1295,13 @@ int pesquisa_binaria_indice_parcial(char comparativo[]){
         
         indice = strtok(backup, ";"); //separa só o nome
 
-        for(int i = 0; i<strlen(indice); i++){ //converte para minusculas
+        /*for(int i = 0; i<strlen(indice); i++){ //converte para minusculas
             if(indice[i]>='A' && indice[i]<='Z')
                 indice[i] = tolower(indice[i]);
-        }
+        }*/
 
         int resultado = strcmp(indice, comparacao); //compara
-        //printf("\n%s VS %s = %d - %d VS %d -", indice, comparacao, resultado, indice[0], comparacao[0]);
+        printf("\n%s VS %s = %d - %d VS %d -", indice, comparacao, resultado, indice[0], comparacao[0]);
 
         if(resultado == 0){
             fseek(read_ptr, offset, SEEK_SET); //retoma a posição calculada (a leitura fez com que estivesse na posição seguinte)
@@ -1261,10 +1339,12 @@ int pesquisa_binaria_indice_exaustivo(char comparativo[]){
     char buffer[350], *indice, ultime[350], backup[350], carac, comparacao[350];
     int i, ultimo;
 
-    for(i = 0; i<strlen(comparativo); i++){ //coloca em minúsculas (tolower()) para efeito de comaparação
+    strcpy(comparacao, comparativo);
+
+    /*for(i = 0; i<strlen(comparativo); i++){ //coloca em minúsculas (tolower()) para efeito de comaparação
         comparacao[i] = tolower(comparativo[i]);
     }
-    comparacao[i] = '\0'; //encerra novo string com minusculas
+    comparacao[i] = '\0'; //encerra novo string com minusculas*/
 
     fseek(read_ptr, 0, SEEK_END); 
     int fim = ftell(read_ptr); //indica o tamanho do arquivo
@@ -1290,10 +1370,10 @@ int pesquisa_binaria_indice_exaustivo(char comparativo[]){
         
         indice = strtok(buffer, ";"); //separa só o ID
 
-        for(int i = 0; i<strlen(indice); i++){ //converte para minusculas
+        /*for(int i = 0; i<strlen(indice); i++){ //converte para minusculas
             if(indice[i]>='A' && indice[i]<='Z')
                 indice[i] = tolower(indice[i]);
-        }
+        }*/
 
         int resultado = strcmp(indice, comparacao); //compara
         //printf("\n%s VS %s = %d - %d VS %d -", indice, comparacao, resultado, indice[0], comparacao[0]);
@@ -1323,52 +1403,6 @@ int pesquisa_binaria_indice_exaustivo(char comparativo[]){
 
 int main(){
     setlocale(LC_ALL, "");
-    
-    
-    /*seconds = time(NULL);
-    gera_indice_id();
-    secondos = time(NULL);
-    total = secondos - seconds;
-    printf("IE: %ld\n", total);
-    gera_csv_id();
-
-    if(pesquisa_binaria("ZZZZZZZZZZZZZZZZZZZZZZ") == 0)
-        printf("\nEncontrado com sucesso\n");
-    else
-        printf("Puts");
-
-    if(pesquisa_binaria_indice_parcial("ZZZZZZZZZZZZZZZZZZZZZZ") == 0)
-        printf("\nEncontrado com sucesso\n");
-    else
-        printf("Puts");
-
-    if(pesquisa_binaria_indice_exaustivo("com.applocker.applockro") == 0)
-        printf("\nEncontrado com sucesso\n");
-    else
-        printf("Puts");
-
-    node *root;
-    char instruction;
-    root = NULL;
-    seconds = time(NULL);
-    gera_arvore(&root);
-    secondos = time(NULL);
-    total = secondos - seconds;
-    printf("\nARVORE: %ld\n", total);
-    findAndPrint(root, 3987, instruction = 'a');
-
-    struct nodo_header *raiz;
-    raiz = NULL;
-    seconds = time(NULL);
-    gera_indice_lista(&raiz);
-    secondos = time(NULL);
-    total = secondos - seconds;
-    printf("\nLISTA: %ld\n", total);
-
-    if(consulta(raiz, "Social", 150) == 0) //modo "write" escreve toda a multilista, todas outras palavras são uma busca para ela
-      printf("Sucesso");
-    else
-      printf("Falha miserável");*/
 
     char escolha;
     time_t inicio, fim, total;
@@ -1384,17 +1418,20 @@ int main(){
     }
     else return 1;
 
-    int partial_index = 0, ID_index = 0, lista_index = 0, arvore_index = 0, key, limit;
-    node *root;
+    int partial_index = 0, ID_index = 0, lista_index = 0, arvore_index = 0, get = 1, key, key2, limit;
+    node *root_tree;
     char instruction;
-    root = NULL;
+    root_tree = NULL;
+    struct nodo_header *raiz_lista = NULL;
+    char chave_busca[350], chave_busca2[350];
 
     while (1)
     {
       system("pause");
-      getchar();
+      if(get) getchar();
+      get = 1;
       system("@cls||clear");
-      printf("Escolha a operacao que deseja resolver:\n0 - Sair\n1 - Gerar indice parcial em arquivo\n2 - Gerar indice em arquivo com ordenacao pela coluna ID\n3 - Gerar indice em memoria com B+-Tree para armazenar agrupamentos de instalações\n4 - Gerar indice em memoria com multilista para armazenar agrupamentos de categorias\n5 - Consulta por chave primaria no arquivo bruto\n6 - Consulta por chave primaria no indice\n7 - Consulta por chave secundaria (ID) no indice\n8 - Consulta por numero exato de downloads\n9 - Consulta por faixa de downloads\n10 - Consulta por apps de determinada categoria\n11 - Consulta por existencia de chave em determinada categoria\n");
+      printf("Escolha a operacao que deseja resolver:\n0 - Sair\n1 - Gerar indice parcial em arquivo\n2 - Gerar indice em arquivo com ordenacao pela coluna ID\n3 - Gerar indice em memoria com B+-Tree para armazenar agrupamentos de instalações\n4 - Gerar indice em memoria com multilista para armazenar agrupamentos de categorias\n5 - Consulta por chave primaria no arquivo bruto\n6 - Consulta por chave primaria no indice\n7 - Consulta por chave secundaria (ID) no indice\n8 - Consulta por numero exato de downloads\n9 - Consulta por faixa de downloads\nA - Consulta por apps de determinada categoria\nB - Consulta por existencia de chave em determinada categoria\n");
       escolha = getchar();
       switch (escolha)
       {
@@ -1423,10 +1460,60 @@ int main(){
         printf("Aguarde enquanto a B+-Tree por downloads esta sendo gerada...\n");
         arvore_index = 1;
         inicio = time(NULL);
-        gera_arvore(&root);
+        gera_arvore(&root_tree);
         fim = time(NULL);
         total = fim - inicio;
         printf("B+-Tree gerada em %ld segundos\n", total);
+        break;
+      case '4':
+        printf("Aguarde enquanto a multilista de categorias esta sendo gerada...\n");
+        lista_index = 1;
+        inicio = time(NULL);
+        gera_indice_lista(&raiz_lista);
+        fim = time(NULL);
+        total = fim - inicio;
+        printf("Multilista gerada em %ld segundos\n", total);
+        break;
+      case '5':
+        printf("Qual a chave de busca? ");
+        getchar();
+        gets(chave_busca);
+        if(pesquisa_binaria(chave_busca) == 0)
+          printf("\nEncontrado com sucesso\n");
+        else
+          printf("Puts");
+
+        get = 0;
+        break;
+      case '6':
+        if(!partial_index){
+          printf("Gere indice parcial antes de consulta-lo\n");
+          break;
+        }
+        printf("Qual a chave de busca? ");
+        getchar();
+        gets(chave_busca);
+        if(pesquisa_binaria_indice_parcial(chave_busca) == 0)
+          printf("\nEncontrado com sucesso\n");
+        else
+          printf("Puts");
+    
+        get = 0;
+        break;
+      case '7':
+        if(!ID_index){
+          printf("Gere indice por ID antes de consulta-lo\n");
+          break;
+        }
+        printf("Qual a chave de busca? ");
+        getchar();
+        gets(chave_busca);
+        if(pesquisa_binaria_indice_exaustivo(chave_busca) == 0)
+          printf("\nEncontrado com sucesso\n");
+        else
+          printf("Puts");
+    
+        get = 0;
         break;
       case '8':
         if(!arvore_index){
@@ -1437,7 +1524,46 @@ int main(){
         scanf(" %d", &key);
         printf("Qual o limite de registros para a visualizacao? ");
         scanf(" %d", &limit);
-        findAndPrint(root, key, instruction = 'a', limit);
+        findAndPrint(root_tree, key, instruction = 'a', limit);
+        break;
+      case '9':
+        if(!arvore_index){
+          printf("Gere a arvore antes de consulta-la\n");
+          break;
+        }
+        printf("Qual a chave (numero de downloads) minima de busca? ");
+        scanf(" %d", &key);
+        printf("Qual a chave (numero de downloads) maxima de busca? ");
+        scanf(" %d", &key2);
+        printf("Qual o limite de registros para a visualizacao? ");
+        scanf(" %d", &limit);
+        findAndPrintRange(root_tree, key, key2,instruction = 'a', limit);
+        break;
+      case 'A':
+        if(!lista_index){
+          printf("Gere a lista antes de consulta-la\n");
+          break;
+        }
+        printf("Qual a chave (categoria) de busca? ");
+        getchar();
+        gets(chave_busca);
+        printf("Qual o limite de registros para a visualizacao? ");
+        scanf(" %d", &limit);
+        consulta_categoria(raiz_lista, chave_busca, limit); //modo "write" escreve toda a multilista, todas outras palavras são uma busca para ela
+          
+        break;
+      case 'B':
+        if(!lista_index){
+          printf("Gere a lista antes de consulta-la\n");
+          break;
+        }
+        printf("Qual a chave (categoria) de busca? ");
+        getchar();
+        gets(chave_busca);
+        printf("Qual a chave (app) de busca? ");
+        gets(chave_busca2);
+        consulta_chave_categoria(raiz_lista, chave_busca, chave_busca2);
+        get = 0;
         break;
       default:
         break;
