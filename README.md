@@ -1,1 +1,3 @@
-A média de instalações de aplicativos free é maior do que a média dos aplicativos premium?h
+O App ____ existe na loja?
+Quais são os apps na loja da categoria ____?
+Quais apps possuem entre ____ e ____ downloads?
